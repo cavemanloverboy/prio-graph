@@ -187,8 +187,11 @@ impl<
 
     /// Pop the highest priority node id from the main queue.
     /// Returns None if the queue is empty.
-    pub fn peek_top(&mut self) -> Option<&Tl> {
-        self.main_queue.peek()
+    pub fn peek_top_by<T: Ord>(
+        &mut self,
+        by: impl FnMut(&(&Id, &crate::graph_node::GraphNode<Id>)) -> T,
+    ) -> Option<&Id> {
+        self.nodes.iter().max_by_key(by).map(|node| node.0)
     }
 
     /// This will unblock transactions that were blocked by this transaction.
