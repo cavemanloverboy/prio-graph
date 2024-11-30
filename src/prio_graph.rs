@@ -97,7 +97,13 @@ impl<
 
     /// Insert a transaction into the graph with the given `Id`.
     /// `Transaction`s should be inserted in priority order.
-    pub fn insert_transaction(&mut self, id: Id, tx: impl IntoIterator<Item = (Rk, AccessKind)>) {
+    ///
+    /// Returns true if the node is not blocked upon insert
+    pub fn insert_transaction(
+        &mut self,
+        id: Id,
+        tx: impl IntoIterator<Item = (Rk, AccessKind)>,
+    ) -> bool /* active */ {
         let mut node = GraphNode {
             active: true,
             edges: Vec::new(),
@@ -153,9 +159,11 @@ impl<
         self.nodes.insert(id, node);
 
         // If the node is not blocked, add it to the main queue.
-        if self.nodes.get(&id).unwrap().blocked_by_count == 0 {
+        let unblocked = self.nodes.get(&id).unwrap().blocked_by_count == 0;
+        if unblocked {
             self.main_queue.push(self.create_top_level_id(id));
         }
+        unblocked
     }
 
     /// Returns true if the main queue is empty.
