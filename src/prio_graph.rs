@@ -226,6 +226,13 @@ impl<
             .unwrap_or_default()
     }
 
+    /// Returns the number of active nodes
+    pub fn active_nodes(&self) -> usize {
+        self.nodes
+            .iter()
+            .fold(0_usize, |acc, (_id, node)| acc + (node.active as usize))
+    }
+
     fn create_top_level_id(&self, id: Id) -> Tl {
         (self.top_level_prioritization_fn)(&id, self.nodes.get(&id).unwrap())
     }
@@ -311,6 +318,31 @@ mod tests {
 
     fn test_top_level_priority_fn(id: &TxId, _node: &GraphNode<TxId>) -> TxId {
         *id
+    }
+
+    #[test]
+    fn test_unblock() {
+        // Setup:
+        // 3 -> 2 -> 1
+        // batches: [3], [2], [1]
+        let (transaction_lookup_table, transaction_queue) =
+            setup_test([(vec![3, 2, 1], vec![], vec![0])]);
+
+        // Insert all transactions into the graph.
+        let mut graph = PrioGraph::new(test_top_level_priority_fn);
+        let iter = create_lookup_iterator(&transaction_lookup_table, &transaction_queue);
+        for (id, tx) in iter.into_iter() {
+            graph.insert_transaction(id, tx);
+        }
+
+        assert_eq!(graph.active_nodes(), 3);
+        assert_eq!(graph.pop_and_unblock(), Some((3, vec![2])));
+        assert_eq!(graph.active_nodes(), 2);
+        assert_eq!(graph.pop_and_unblock(), Some((2, vec![1])));
+        assert_eq!(graph.active_nodes(), 1);
+        assert_eq!(graph.pop_and_unblock(), Some((1, vec![])));
+        assert_eq!(graph.active_nodes(), 0);
+        assert_eq!(graph.pop_and_unblock(), None);
     }
 
     #[test]
