@@ -185,6 +185,12 @@ impl<
         self.main_queue.pop().map(|top_level_id| top_level_id.id())
     }
 
+    /// Pop the highest priority node id from the main queue.
+    /// Returns None if the queue is empty.
+    pub fn peek_top(&mut self) -> Option<&Tl> {
+        self.main_queue.peek()
+    }
+
     /// This will unblock transactions that were blocked by this transaction.
     /// Returns the set of `Id`s that were unblocked.
     ///
