@@ -187,11 +187,15 @@ impl<
 
     /// Pop the highest priority node id from the main queue.
     /// Returns None if the queue is empty.
-    pub fn peek_top_by<T: Ord>(
+    pub fn peek_top_active_by<T: Ord>(
         &mut self,
         by: impl FnMut(&(&Id, &crate::graph_node::GraphNode<Id>)) -> T,
     ) -> Option<&Id> {
-        self.nodes.iter().max_by_key(by).map(|node| node.0)
+        self.nodes
+            .iter()
+            .filter(|node| node.1.active)
+            .max_by_key(by)
+            .map(|node| node.0)
     }
 
     /// This will unblock transactions that were blocked by this transaction.
@@ -327,6 +331,36 @@ mod tests {
 
     fn test_top_level_priority_fn(id: &TxId, _node: &GraphNode<TxId>) -> TxId {
         *id
+    }
+
+    #[test]
+    fn test_peek_top_active_by() {
+        // Setup:
+        // 3 -> 2 -> 1
+        // batches: [3], [2], [1]
+        let (transaction_lookup_table, transaction_queue) =
+            setup_test([(vec![3, 2, 1], vec![], vec![0])]);
+
+        // Insert all transactions into the graph.
+        let mut graph = PrioGraph::new(test_top_level_priority_fn);
+        let iter = create_lookup_iterator(&transaction_lookup_table, &transaction_queue);
+        for (id, tx) in iter.into_iter() {
+            graph.insert_transaction(id, tx);
+        }
+
+        assert_eq!(graph.peek_top_active_by(|n| *n.0), Some(&3));
+
+        assert_eq!(graph.pop_and_unblock(), Some((3, vec![2])));
+        assert_eq!(graph.peek_top_active_by(|n| *n.0), Some(&2));
+
+        assert_eq!(graph.pop_and_unblock(), Some((2, vec![1])));
+        assert_eq!(graph.peek_top_active_by(|n| *n.0), Some(&1));
+
+        assert_eq!(graph.pop_and_unblock(), Some((1, vec![])));
+        assert_eq!(graph.peek_top_active_by(|n| *n.0), None);
+
+        assert_eq!(graph.pop_and_unblock(), None);
+        assert_eq!(graph.peek_top_active_by(|n| *n.0), None);
     }
 
     #[test]
